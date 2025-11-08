@@ -1,46 +1,54 @@
-import React, { useEffect, useState } from "react";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
-import { db } from "../../firebase/firebaseConfig";
+import { useEffect, useState } from "react";
+import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
 import { useAuthContext } from "../../firebase/useAuth";
+import { app } from "../../firebase/firebaseConfig";
 
-export default function EmployeeList({ limitCount }){
-  const [rows, setRows] = useState([]);
-  const { appUser } = useAuthContext();
+const db = getFirestore(app);
+
+export default function EmployeeList({ instituteOnly }) {
+  const { user, role } = useAuthContext();
+  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
-    async function load(){
-      let q;
-      const coll = collection(db, "employees");
-      if (appUser?.role === "InstituteRep") {
-        q = query(coll, where("instituteId", "==", appUser.instituteId), orderBy("createdAt", "desc"), ...(limitCount ? [limit(limitCount)] : []));
-      } else {
-        q = query(coll, orderBy("createdAt", "desc"), ...(limitCount ? [limit(limitCount)] : []));
+    const fetchEmployees = async () => {
+      try {
+        let q;
+        if (role === "SuperAdmin") {
+          q = query(collection(db, "employees"));
+        } else if (instituteOnly && user) {
+          const userSnap = await getDocs(collection(db, "users"));
+          const rep = userSnap.docs.find((d) => d.id === user.uid);
+          const instId = rep?.data()?.institute_id;
+          q = query(collection(db, "employees"), where("institute_id", "==", instId));
+        }
+        const snapshot = await getDocs(q);
+        setEmployees(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error("Error fetching employees:", err);
       }
-      const snap = await getDocs(q);
-      setRows(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }
-    if (appUser) load();
-  }, [appUser, limitCount]);
+    };
+    fetchEmployees();
+  }, [user, role, instituteOnly]);
 
   return (
-    <div className="w-full">
-      <table className="w-full text-left">
+    <div>
+      <h2 className="text-2xl font-semibold mb-4">Employees</h2>
+      <table className="min-w-full bg-white rounded shadow">
         <thead>
-          <tr className="text-sm text-slate-500">
-            <th>Name</th>
-            <th>CNIC</th>
-            <th>Designation</th>
+          <tr className="bg-gray-100">
+            <th className="p-2 text-left">Full Name</th>
+            <th className="p-2 text-left">CNIC</th>
+            <th className="p-2 text-left">Designation</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
-            <tr key={r.id} className="border-t">
-              <td className="py-2">{r.fullName}</td>
-              <td>{r.cnic}</td>
-              <td>{r.designation || "-"}</td>
+          {employees.map((emp) => (
+            <tr key={emp.id} className="border-b">
+              <td className="p-2">{emp.full_name}</td>
+              <td className="p-2">{emp.cnic}</td>
+              <td className="p-2">{emp.designation}</td>
             </tr>
           ))}
-          {rows.length===0 && <tr><td colSpan={3} className="p-4 text-sm text-slate-500">No records</td></tr>}
         </tbody>
       </table>
     </div>
