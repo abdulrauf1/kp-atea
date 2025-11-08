@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuthContext } from "../../firebase/useAuth";
-import logo from "../../assets/logo.png"; // 👈 Add your logo here (place it in src/assets)
+import logo from "../../assets/logo.png";
 
 export default function Sidebar() {
   const location = useLocation();
